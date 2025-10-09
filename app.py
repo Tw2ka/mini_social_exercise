@@ -869,7 +869,7 @@ def loop_color(user_id):
 
 # ----- Functions to be implemented are below
 
-# Task 3.1
+# Task 3.3
 def recommend(user_id, filter_following):
     """
     Args:
@@ -890,9 +890,49 @@ def recommend(user_id, filter_following):
     - https://www.researchgate.net/publication/227268858_Recommender_Systems_Handbook
     """
 
-    recommended_posts = {} 
+    # 1. Get the content of all posts the user has liked (reacted to)
+    liked_posts_content = query_db('''SELECT p.content FROM posts p JOIN reactions r ON p.id = r.post_id WHERE r.user_id = ?''', (user_id,))
 
-    return recommended_posts;
+    # If the user hasn't liked any posts return the 5 newest posts
+    if not liked_posts_content: return query_db('''SELECT p.id, p.content, p.created_at, u.username, u.id as user_id FROM posts p JOIN users u ON p.user_id = u.id WHERE p.user_id != ? ORDER BY p.created_at DESC LIMIT 5''', (user_id,))
+
+    # 2. Find the most common words from the posts they liked
+    word_counts = collections.Counter()
+    # A simple list of common words to ignore
+    stop_words = {'a', 'an', 'the', 'in', 'on', 'is', 'it', 'to', 'for', 'of', 'and', 'with'}
+    
+    for post in liked_posts_content:
+        # Use regex to find all words in the post content
+        words = re.findall(r'\b\w+\b', post['content'].lower())
+        for word in words:
+            if word not in stop_words and len(word) > 2:
+                word_counts[word] += 1
+    
+    top_keywords = [word for word, _ in word_counts.most_common(10)]
+
+    query = "SELECT p.id, p.content, p.created_at, u.username, u.id as user_id FROM posts p JOIN users u ON p.user_id = u.id"
+    params = []
+    
+    # If filtering by following, add a WHERE clause to only include followed users.
+    if filter_following:
+        query += " WHERE p.user_id IN (SELECT followed_id FROM follows WHERE follower_id = ?)"
+        params.append(user_id)
+        
+    all_other_posts = query_db(query, tuple(params))
+    
+    recommended_posts = []
+    liked_post_ids = {post['id'] for post in query_db('SELECT post_id as id FROM reactions WHERE user_id = ?', (user_id,))}
+
+    for post in all_other_posts:
+        if post['id'] in liked_post_ids or post['user_id'] == user_id:
+            continue
+        
+        if any(keyword in post['content'].lower() for keyword in top_keywords):
+            recommended_posts.append(post)
+
+    recommended_posts.sort(key=lambda p: p['created_at'], reverse=True)
+    
+    return recommended_posts[:5]
 
 # Task 3.2
 def user_risk_analysis(user_id):
@@ -908,13 +948,23 @@ def user_risk_analysis(user_id):
             password: admin
         Then, navigate to the /admin endpoint. (http://localhost:8080/admin)
     """
-    
+
     score = 0
+
+    user_posts = query_db('SELECT content FROM posts WHERE user_id = ?', (user_id,))
+    for post in user_posts:
+        _, post_risk_score = moderate_content(post['content'])
+        score += max(1, post_risk_score)
+
+    user_comments = query_db('SELECT content FROM comments WHERE user_id = ?', (user_id,))
+    for comment in user_comments:
+        _, comment_risk_score = moderate_content(comment['content'])
+        score += max(1, comment_risk_score)
 
     return score;
 
     
-# Task 3.3
+# Task 3.1
 def moderate_content(content):
     """
     Args
@@ -932,10 +982,16 @@ def moderate_content(content):
     Then, navigate to the /admin endpoint. (http://localhost:8080/admin)
     """
 
-    moderated_content = content
+    original_content = content
     score = 0
     
-    return moderated_content, score
+    TIER3_PATTERN = r'\b(' + '|'.join(re.escape(word) for word in TIER3_WORDS) + r')\b'
+    matches = re.findall(TIER3_PATTERN, original_content, flags=re.IGNORECASE)
+    score = len(matches) * 2
+
+    moderate_content = re.sub(TIER3_PATTERN, lambda m: '*' * len(m.group(0)), original_content, flags=re.IGNORECASE)
+ 
+    return moderate_content, score
 
 
 if __name__ == '__main__':
