@@ -1,0 +1,1 @@
+data = pd.read_csvd("posts.cv")
