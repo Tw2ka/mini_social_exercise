@@ -1034,8 +1034,8 @@ def moderate_content(content):
     original_content = content
     score = 0
 
-    """Stage 1.1"""
-
+    # Stage 1.1
+    # Rule 1.1.1
     TIER1_PATTERN = r'\b(' + '|'.join(re.escape(word)
                                       for word in TIER1_WORDS) + r')\b'
     matches = re.findall(TIER1_PATTERN, original_content, flags=re.IGNORECASE)
@@ -1044,6 +1044,7 @@ def moderate_content(content):
         score = 5
         moderate_content = '[content removed due to severe violation]'
     else:
+        # Rule 1.1.2
         TIER2_PATTERN = r'(' + '|'.join(re.escape(phrase)
                                         for phrase in TIER2_PHRASES) + r')'
         matches = re.findall(
@@ -1052,7 +1053,8 @@ def moderate_content(content):
             score = 5
             moderate_content = '[content removed due to spam/scam policy]'
         else:
-            """Stage 1.2"""
+            # Stage 1.2
+            # Rule 1.2.1
             TIER3_PATTERN = r'\b(' + '|'.join(re.escape(word)
                                               for word in TIER3_WORDS) + r')\b'
             matches = re.findall(
@@ -1060,6 +1062,18 @@ def moderate_content(content):
             score = len(matches) * 2
             moderate_content = re.sub(
                 TIER3_PATTERN, lambda m: '*' * len(m.group(0)), original_content, flags=re.IGNORECASE)
+
+            # Rule 1.2.2
+            pattern = re.compile(
+                r'(https?://[^\s]+|www\.[^\s]+)', re.IGNORECASE)
+            url_matches = pattern.findall(moderate_content)
+            # score = len(url_matches) * 2
+            replace_text = "[link removed]"
+
+            if url_matches:
+                moderate_content = re.sub(pattern, replace_text,
+                                          moderate_content)
+                score = len(url_matches) * 2
 
     return moderate_content, score
 
