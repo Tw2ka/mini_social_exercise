@@ -1074,6 +1074,33 @@ def moderate_content(content):
                 moderate_content = re.sub(pattern, replace_text,
                                           moderate_content)
                 score = len(url_matches) * 2
+            else:
+                pass
+
+            # Rule 1.2.3
+            characters_in_string = 0
+            capitalized_characters = 0
+            capitalize_ratio = 0
+            for c in moderate_content:
+                if c.isalpha():
+                    characters_in_string = characters_in_string + 1
+                    if c.isupper():
+                        capitalized_characters = capitalized_characters + 1
+                else:
+                    pass
+
+            if characters_in_string > 0:
+                capitalize_ratio = capitalized_characters / characters_in_string
+            else:
+                pass
+
+            if characters_in_string > 15:
+                if capitalize_ratio > 0.7:
+                    score = score + 0.5
+                else:
+                    pass
+            else:
+                pass
 
     return moderate_content, score
 
