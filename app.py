@@ -1010,6 +1010,12 @@ def user_risk_analysis(user_id):
         _, comment_risk_score = moderate_content(comment['content'])
         score += max(1, comment_risk_score)
 
+    user_profile = query_db(
+        'SELECT profile FROM users WHERE id = ?', (user_id,))
+    for profile in user_profile:
+        _, profile_risk_score = moderate_content(profile['content'])
+        score += max(1, profile_risk_score)
+
     return score
 
 
