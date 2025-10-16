@@ -1010,11 +1010,11 @@ def user_risk_analysis(user_id):
         _, comment_risk_score = moderate_content(comment['content'])
         score += max(1, comment_risk_score)
 
-    user_profile = query_db(
+    user_profiles = query_db(
         'SELECT profile FROM users WHERE id = ?', (user_id,))
-    for profile in user_profile:
-        _, profile_risk_score = moderate_content(profile['content'])
-        score += max(1, profile_risk_score)
+    #for bio in user_profiles:
+    #    _, profile_risk_score = moderate_content(bio['profile'])
+    #    score += max(1, profile_risk_score)
 
     return score
 
@@ -1038,75 +1038,79 @@ def moderate_content(content):
     """
 
     original_content = content
+    moderate_content = ""; #huom tämä ei ole oikein palauttanee tyhjän atm
     score = 0
 
-    # Stage 1.1
-    # Rule 1.1.1
-    TIER1_PATTERN = r'\b(' + '|'.join(re.escape(word)
-                                      for word in TIER1_WORDS) + r')\b'
-    matches = re.findall(TIER1_PATTERN, original_content, flags=re.IGNORECASE)
+    if not original_content:
+        # Stage 1.1
+        # Rule 1.1.1
+        TIER1_PATTERN = r'\b(' + '|'.join(re.escape(word)
+                                        for word in TIER1_WORDS) + r')\b'
+        matches = re.findall(TIER1_PATTERN, original_content, flags=re.IGNORECASE)
 
-    if matches:
-        score = 5
-        moderate_content = '[content removed due to severe violation]'
-    else:
-        # Rule 1.1.2
-        TIER2_PATTERN = r'(' + '|'.join(re.escape(phrase)
-                                        for phrase in TIER2_PHRASES) + r')'
-        matches = re.findall(
-            TIER2_PATTERN, original_content, flags=re.IGNORECASE)
         if matches:
             score = 5
-            moderate_content = '[content removed due to spam/scam policy]'
+            moderate_content = '[content removed due to severe violation]'
         else:
-            # Stage 1.2
-            # Rule 1.2.1
-            TIER3_PATTERN = r'\b(' + '|'.join(re.escape(word)
-                                              for word in TIER3_WORDS) + r')\b'
+            # Rule 1.1.2
+            TIER2_PATTERN = r'(' + '|'.join(re.escape(phrase)
+                                            for phrase in TIER2_PHRASES) + r')'
             matches = re.findall(
-                TIER3_PATTERN, original_content, flags=re.IGNORECASE)
-            score = len(matches) * 2
-            moderate_content = re.sub(
-                TIER3_PATTERN, lambda m: '*' * len(m.group(0)), original_content, flags=re.IGNORECASE)
-
-            # Rule 1.2.2
-            pattern = re.compile(
-                r'(https?://[^\s]+|www\.[^\s]+)', re.IGNORECASE)
-            url_matches = pattern.findall(moderate_content)
-            # score = len(url_matches) * 2
-            replace_text = "[link removed]"
-
-            if url_matches:
-                moderate_content = re.sub(pattern, replace_text,
-                                          moderate_content)
-                score = len(url_matches) * 2
+                TIER2_PATTERN, original_content, flags=re.IGNORECASE)
+            if matches:
+                score = 5
+                moderate_content = '[content removed due to spam/scam policy]'
             else:
-                pass
+                # Stage 1.2
+                # Rule 1.2.1
+                TIER3_PATTERN = r'\b(' + '|'.join(re.escape(word)
+                                                for word in TIER3_WORDS) + r')\b'
+                matches = re.findall(
+                    TIER3_PATTERN, original_content, flags=re.IGNORECASE)
+                score = len(matches) * 2
+                moderate_content = re.sub(
+                    TIER3_PATTERN, lambda m: '*' * len(m.group(0)), original_content, flags=re.IGNORECASE)
 
-            # Rule 1.2.3
-            characters_in_string = 0
-            capitalized_characters = 0
-            capitalize_ratio = 0
-            for c in moderate_content:
-                if c.isalpha():
-                    characters_in_string = characters_in_string + 1
-                    if c.isupper():
-                        capitalized_characters = capitalized_characters + 1
+                # Rule 1.2.2
+                pattern = re.compile(
+                    r'(https?://[^\s]+|www\.[^\s]+)', re.IGNORECASE)
+                url_matches = pattern.findall(moderate_content)
+                # score = len(url_matches) * 2
+                replace_text = "[link removed]"
+
+                if url_matches:
+                    moderate_content = re.sub(pattern, replace_text,
+                                            moderate_content)
+                    score = len(url_matches) * 2
                 else:
                     pass
 
-            if characters_in_string > 0:
-                capitalize_ratio = capitalized_characters / characters_in_string
-            else:
-                pass
+                # Rule 1.2.3
+                characters_in_string = 0
+                capitalized_characters = 0
+                capitalize_ratio = 0
+                for c in moderate_content:
+                    if c.isalpha():
+                        characters_in_string = characters_in_string + 1
+                        if c.isupper():
+                            capitalized_characters = capitalized_characters + 1
+                    else:
+                        pass
 
-            if characters_in_string > 15:
-                if capitalize_ratio > 0.7:
-                    score = score + 0.5
+                if characters_in_string > 0:
+                    capitalize_ratio = capitalized_characters / characters_in_string
                 else:
                     pass
-            else:
-                pass
+
+                if characters_in_string > 15:
+                    if capitalize_ratio > 0.7:
+                        score = score + 0.5
+                    else:
+                        pass
+                else:
+                    pass
+    else:
+        pass
 
     return moderate_content, score
 
