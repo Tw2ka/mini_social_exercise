@@ -12,6 +12,7 @@ def main():
     nltk.download('punkt')
     nltk.download('stopwords')
     nltk.download('wordnet')
+    nltk.download('punkt_tab')
 
     # Load data
     data = pd.read_csv("posts.csv")
