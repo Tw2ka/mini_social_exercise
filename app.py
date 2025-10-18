@@ -997,26 +997,71 @@ def user_risk_analysis(user_id):
     """
 
     score = 0
+    total_post_score = 0
+    number_of_posts = 0
+    average_post_score = 0
+    total_comment_score = 0
+    number_of_comments = 0
+    average_comment_score = 0
+    profile_score = 0
+    content_risk_score = 0
+    user_risk_score = 0
 
     user_posts = query_db(
         'SELECT content FROM posts WHERE user_id = ?', (user_id,))
     for post in user_posts:
         _, post_risk_score = moderate_content(post['content'])
         score += max(1, post_risk_score)
+        total_post_score += post_risk_score
+        number_of_posts += 1
+
+    if number_of_posts != 0:
+        average_post_score = total_post_score / number_of_posts
+    else:
+        average_post_score = 0
 
     user_comments = query_db(
         'SELECT content FROM comments WHERE user_id = ?', (user_id,))
     for comment in user_comments:
         _, comment_risk_score = moderate_content(comment['content'])
         score += max(1, comment_risk_score)
+        total_comment_score += comment_risk_score
+        number_of_comments += 1
 
+    if number_of_comments != 0:
+        average_comment_score = total_comment_score / number_of_comments
+    else:
+        average_comment_score = 0
+
+    # Rule 2.2: User Risk Score
     user_profiles = query_db(
         'SELECT profile FROM users WHERE id = ?', (user_id,))
-    #for bio in user_profiles:
-    #    _, profile_risk_score = moderate_content(bio['profile'])
-    #    score += max(1, profile_risk_score)
+    for bio in user_profiles:
+        if bio['profile'] is not None:
+            _, profile_risk_score = moderate_content(bio['profile'])
+            profile_score += max(0, profile_risk_score)
+        else:
+            pass
 
-    return score
+    content_risk_score = (profile_score * 1) + \
+        (average_post_score * 3) + (average_comment_score * 1)
+
+    profile_ages_raw = query_db(
+        'SELECT created_at FROM users WHERE id = ?', (user_id,))
+    for user in profile_ages_raw:
+        user_created_at = user['created_at']
+        user_age_days = (datetime.utcnow() - user_created_at).days
+        if user_age_days < 7:
+            user_risk_score = content_risk_score * 1.5
+        elif user_age_days < 30:
+            user_risk_score = content_risk_score * 1.2
+        else:
+            user_risk_score = content_risk_score
+
+    if user_risk_score > 5.0:
+        user_risk_score = 5.0
+
+    return user_risk_score
 
 
 # Task 3.1
@@ -1038,79 +1083,87 @@ def moderate_content(content):
     """
 
     original_content = content
-    moderate_content = ""; #huom tämä ei ole oikein palauttanee tyhjän atm
     score = 0
 
-    if not original_content:
-        # Stage 1.1
-        # Rule 1.1.1
-        TIER1_PATTERN = r'\b(' + '|'.join(re.escape(word)
-                                        for word in TIER1_WORDS) + r')\b'
-        matches = re.findall(TIER1_PATTERN, original_content, flags=re.IGNORECASE)
+    # Stage 1.1
+    # Rule 1.1.1
+    TIER1_PATTERN = r'\b(' + '|'.join(re.escape(word)
+                                      for word in TIER1_WORDS) + r')\b'
+    matches = re.findall(
+        TIER1_PATTERN, original_content, flags=re.IGNORECASE)
 
+    if matches:
+        score = 5
+        moderate_content = '[content removed due to severe violation]'
+    else:
+        # Rule 1.1.2
+        TIER2_PATTERN = r'(' + '|'.join(re.escape(phrase)
+                                        for phrase in TIER2_PHRASES) + r')'
+        matches = re.findall(
+            TIER2_PATTERN, original_content, flags=re.IGNORECASE)
         if matches:
             score = 5
-            moderate_content = '[content removed due to severe violation]'
+            moderate_content = '[content removed due to spam/scam policy]'
         else:
-            # Rule 1.1.2
-            TIER2_PATTERN = r'(' + '|'.join(re.escape(phrase)
-                                            for phrase in TIER2_PHRASES) + r')'
+            # Stage 1.2
+            # Rule 1.2.1
+            TIER3_PATTERN = r'\b(' + '|'.join(re.escape(word)
+                                              for word in TIER3_WORDS) + r')\b'
             matches = re.findall(
-                TIER2_PATTERN, original_content, flags=re.IGNORECASE)
-            if matches:
-                score = 5
-                moderate_content = '[content removed due to spam/scam policy]'
+                TIER3_PATTERN, original_content, flags=re.IGNORECASE)
+            score = len(matches) * 2
+            moderate_content = re.sub(
+                TIER3_PATTERN, lambda m: '*' * len(m.group(0)), original_content, flags=re.IGNORECASE)
+
+            # Rule 1.2.2
+            pattern = re.compile(
+                r'(https?://[^\s]+|www\.[^\s]+)', re.IGNORECASE)
+            url_matches = pattern.findall(moderate_content)
+            replace_text = "[link removed]"
+
+            if url_matches:
+                moderate_content = re.sub(pattern, replace_text,
+                                          moderate_content)
+                score = len(url_matches) * 2
             else:
-                # Stage 1.2
-                # Rule 1.2.1
-                TIER3_PATTERN = r'\b(' + '|'.join(re.escape(word)
-                                                for word in TIER3_WORDS) + r')\b'
-                matches = re.findall(
-                    TIER3_PATTERN, original_content, flags=re.IGNORECASE)
-                score = len(matches) * 2
-                moderate_content = re.sub(
-                    TIER3_PATTERN, lambda m: '*' * len(m.group(0)), original_content, flags=re.IGNORECASE)
+                pass
 
-                # Rule 1.2.2
-                pattern = re.compile(
-                    r'(https?://[^\s]+|www\.[^\s]+)', re.IGNORECASE)
-                url_matches = pattern.findall(moderate_content)
-                # score = len(url_matches) * 2
-                replace_text = "[link removed]"
-
-                if url_matches:
-                    moderate_content = re.sub(pattern, replace_text,
-                                            moderate_content)
-                    score = len(url_matches) * 2
+            # Rule 1.2.3
+            characters_in_string = 0
+            capitalized_characters = 0
+            capitalize_ratio = 0
+            for c in moderate_content:
+                if c.isalpha():
+                    characters_in_string = characters_in_string + 1
+                    if c.isupper():
+                        capitalized_characters = capitalized_characters + 1
                 else:
                     pass
 
-                # Rule 1.2.3
-                characters_in_string = 0
-                capitalized_characters = 0
-                capitalize_ratio = 0
-                for c in moderate_content:
-                    if c.isalpha():
-                        characters_in_string = characters_in_string + 1
-                        if c.isupper():
-                            capitalized_characters = capitalized_characters + 1
-                    else:
-                        pass
+            if characters_in_string > 0:
+                capitalize_ratio = capitalized_characters / characters_in_string
+            else:
+                pass
 
-                if characters_in_string > 0:
-                    capitalize_ratio = capitalized_characters / characters_in_string
+            if characters_in_string > 15:
+                if capitalize_ratio > 0.7:
+                    score = score + 0.5
                 else:
                     pass
+            else:
+                pass
 
-                if characters_in_string > 15:
-                    if capitalize_ratio > 0.7:
-                        score = score + 0.5
-                    else:
-                        pass
+            # extra rule jos yli 1000 merkkiä pitkä niin score +0.5
+            characters_in_string = 0
+            for c in moderate_content:
+                if c.isalpha():
+                    characters_in_string = characters_in_string + 1
                 else:
                     pass
-    else:
-        pass
+            if characters_in_string > 1000:
+                score = score + 0.5
+            else:
+                pass
 
     return moderate_content, score
 
