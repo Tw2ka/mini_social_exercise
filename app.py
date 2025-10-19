@@ -931,22 +931,39 @@ def recommend(user_id, filter_following):
     - https://www.researchgate.net/publication/227268858_Recommender_Systems_Handbook
     """
 
-    # 1. Get the content of all posts the user has liked (reacted to)
-    liked_posts_content = query_db(
-        '''SELECT p.content FROM posts p JOIN reactions r ON p.id = r.post_id WHERE r.user_id = ?''', (user_id,))
+    # Get content of posts user has reacted to
+    liked_posts_content = query_db('''
+        SELECT p.content FROM posts p
+        JOIN reactions r ON p.id = r.post_id
+        WHERE r.user_id = ?
+    ''', (user_id,))
 
-    # If the user hasn't liked any posts return the 5 newest posts
-    if not liked_posts_content:
-        return query_db('''SELECT p.id, p.content, p.created_at, u.username, u.id as user_id FROM posts p JOIN users u ON p.user_id = u.id WHERE p.user_id != ? ORDER BY p.created_at DESC LIMIT 5''', (user_id,))
+    # Same for comments
+    comment_posts_content = query_db('''
+        SELECT p.content FROM posts p
+        JOIN comments c ON p.id = c.post_id
+        WHERE c.user_id = ?
+    ''', (user_id,))
 
-    # 2. Find the most common words from the posts they liked
+    # If the user hasn't liked or commented on any posts return the 5 newest posts
+    if not liked_posts_content and not comment_posts_content:
+        return query_db('''
+            SELECT p.id, p.content, p.created_at, u.username, u.id as user_id
+            FROM posts p JOIN users u ON p.user_id = u.id
+            WHERE p.user_id != ? ORDER BY p.created_at DESC LIMIT 5
+        ''', (user_id,))
+
     word_counts = collections.Counter()
-    # A simple list of common words to ignore
     stop_words = {'a', 'an', 'the', 'in', 'on',
                   'is', 'it', 'to', 'for', 'of', 'and', 'with'}
 
     for post in liked_posts_content:
-        # Use regex to find all words in the post content
+        words = re.findall(r'\b\w+\b', post['content'].lower())
+        for word in words:
+            if word not in stop_words and len(word) > 2:
+                word_counts[word] += 1
+
+    for post in comment_posts_content:
         words = re.findall(r'\b\w+\b', post['content'].lower())
         for word in words:
             if word not in stop_words and len(word) > 2:
@@ -957,7 +974,7 @@ def recommend(user_id, filter_following):
     query = "SELECT p.id, p.content, p.created_at, u.username, u.id as user_id FROM posts p JOIN users u ON p.user_id = u.id"
     params = []
 
-    # If filtering by following, add a WHERE clause to only include followed users.
+    # Add a filter to get posts from people you follow
     if filter_following:
         query += " WHERE p.user_id IN (SELECT followed_id FROM follows WHERE follower_id = ?)"
         params.append(user_id)
@@ -967,9 +984,11 @@ def recommend(user_id, filter_following):
     recommended_posts = []
     liked_post_ids = {post['id'] for post in query_db(
         'SELECT post_id as id FROM reactions WHERE user_id = ?', (user_id,))}
+    commented_post_ids = {post['id'] for post in query_db(
+        'SELECT post_id as id FROM comments WHERE user_id = ?', (user_id,))}
 
     for post in all_other_posts:
-        if post['id'] in liked_post_ids or post['user_id'] == user_id:
+        if post['id'] in liked_post_ids or post['user_id'] == user_id or post['id'] in commented_post_ids:
             continue
 
         if any(keyword in post['content'].lower() for keyword in top_keywords):
@@ -978,8 +997,6 @@ def recommend(user_id, filter_following):
     recommended_posts.sort(key=lambda p: p['created_at'], reverse=True)
 
     return recommended_posts[:5]
-
-# Task 3.2
 
 
 def user_risk_analysis(user_id):
@@ -1033,7 +1050,6 @@ def user_risk_analysis(user_id):
     else:
         average_comment_score = 0
 
-    # Rule 2.2: User Risk Score
     user_profiles = query_db(
         'SELECT profile FROM users WHERE id = ?', (user_id,))
     for bio in user_profiles:
@@ -1060,6 +1076,10 @@ def user_risk_analysis(user_id):
 
     if user_risk_score > 5.0:
         user_risk_score = 5.0
+
+    if total_post_score + total_comment_score >= 20:
+        print("Post score:", total_post_score, "Comment score:",
+              total_comment_score, "User ID:", user_id)
 
     return user_risk_score
 
