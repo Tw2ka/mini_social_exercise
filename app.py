@@ -935,7 +935,7 @@ def recommend(user_id, filter_following):
     liked_posts_content = query_db('''
         SELECT p.content FROM posts p
         JOIN reactions r ON p.id = r.post_id
-        WHERE r.user_id = ?
+        WHERE r.reaction_type = 'like' OR r.reaction_type = 'love' OR r.reaction_type = 'haha' AND r.user_id = ?
     ''', (user_id,))
 
     # Same for comments
