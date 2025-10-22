@@ -12,16 +12,19 @@ df = pd.read_csv('reviews.csv')
 sia = SentimentIntensityAnalyzer()
 
 # Calculate sentiment scores for each review
-df['sentiment_score'] = df['Review'].apply(lambda review: sia.polarity_scores(review)['compound'])
+df['sentiment_score'] = df['Review'].apply(
+    lambda review: sia.polarity_scores(review)['compound'])
 
 # First, calculate both the count and mean sentiment for each location
-location_stats = df.groupby('location')['sentiment_score'].agg(['count', 'mean'])
+location_stats = df.groupby(
+    'location')['sentiment_score'].agg(['count', 'mean'])
 
 # Filter for locations with at least 3 reviews**
 filtered_sentiment_by_location = location_stats[location_stats['count'] >= 3]
 
 # Sort the filtered results by the mean sentiment score
-sorted_filtered_sentiment = filtered_sentiment_by_location.sort_values(by='mean', ascending=False)
+sorted_filtered_sentiment = filtered_sentiment_by_location.sort_values(
+    by='mean', ascending=False)
 
 print("Average sentiment score for each location with at least 3 reviews:")
 print(sorted_filtered_sentiment)
