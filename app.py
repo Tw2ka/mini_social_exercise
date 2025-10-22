@@ -15,6 +15,8 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 app.secret_key = '123456789'
@@ -431,6 +433,7 @@ def post_detail(post_id):
 @app.route('/about')
 def about():
     return render_template('about.html.j2')
+
 
 @app.route('/privacy')
 def privacy():
@@ -1196,6 +1199,7 @@ def moderate_content(content):
 
     return moderate_content, score
 
+
 def topic_search():
     nltk.download('punkt')
     nltk.download('stopwords')
@@ -1208,7 +1212,8 @@ def topic_search():
     data = pd.DataFrame(data_frame)
 
     stop_words = stopwords.words('english')
-    stop_words.extend(['day','one','today','finally','like','see','incredible','would', 'best', 'always', 'amazing', 'bought', 'quick' 'people', 'new', 'fun', 'think', 'know', 'believe', 'many', 'thing', 'need', 'small', 'even', 'make', 'love', 'mean', 'fact', 'question', 'time', 'reason', 'also', 'could', 'true', 'well',  'life', 'said', 'year', 'going', 'good', 'really', 'much', 'want', 'back', 'look', 'article', 'host', 'university', 'reply', 'thanks', 'mail', 'post', 'please'])
+    stop_words.extend(['day', 'one', 'today', 'finally', 'like', 'see', 'incredible', 'would', 'best', 'always', 'amazing', 'bought', 'quick' 'people', 'new', 'fun', 'think', 'know', 'believe', 'many', 'thing', 'need', 'small', 'even', 'make', 'love',
+                      'mean', 'fact', 'question', 'time', 'reason', 'also', 'could', 'true', 'well',  'life', 'said', 'year', 'going', 'good', 'really', 'much', 'want', 'back', 'look', 'article', 'host', 'university', 'reply', 'thanks', 'mail', 'post', 'please'])
 
     lemmatizer = WordNetLemmatizer()
 
@@ -1228,13 +1233,16 @@ def topic_search():
     corpus = [dictionary.doc2bow(tokens) for tokens in bow_list]
 
     K = 10
-    
-    lda = LdaModel(corpus, num_topics=K, id2word=dictionary, passes=10, random_state=2)
 
-    coherence_model = CoherenceModel(model=lda, texts=bow_list, dictionary=dictionary, coherence='c_v')
+    lda = LdaModel(corpus, num_topics=K, id2word=dictionary,
+                   passes=10, random_state=2)
+
+    coherence_model = CoherenceModel(
+        model=lda, texts=bow_list, dictionary=dictionary, coherence='c_v')
     coherence_score = coherence_model.get_coherence()
 
-    print(f'These are the words most representative of each of the {K} topics:')
+    print(
+        f'These are the words most representative of each of the {K} topics:')
     for i, topic in lda.print_topics(num_words=1):
         print(f"Topic {i}: {topic}")
 
@@ -1246,6 +1254,39 @@ def topic_search():
 
     for i, count in enumerate(topic_counts):
         print(f"Topic {i}: {count} posts")
+
+
+def sentiment():
+    # Download the VADER lexicon
+    nltk.download('vader_lexicon')
+
+    # df = pd.read_csv('reviews.csv')
+    db = get_db()
+    cursor = db.cursor()
+    data_frame = pd.read_sql_query('SELECT content FROM posts', db)
+    df = pd.DataFrame(data_frame)
+
+    # Initialize the VADER sentiment analyser
+    sia = SentimentIntensityAnalyzer()
+
+    # Calculate sentiment scores for each review
+    sentiment_score = df.apply(
+        lambda review: sia.polarity_scores(df))
+
+    # First, calculate both the count and mean sentiment for each location
+    # location_stats = df.groupby(
+    #    'location')['sentiment_score'].agg(['count', 'mean'])
+
+    # Filter for locations with at least 3 reviews**
+    # filtered_sentiment_by_location = location_stats[location_stats['count'] >= 3]
+
+    # Sort the filtered results by the mean sentiment score
+    # sorted_filtered_sentiment = filtered_sentiment_by_location.sort_values(
+    #    by='mean', ascending=False)
+
+    # print("Average sentiment score for each location with at least 3 reviews:")
+    # print(sorted_filtered_sentiment)
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
