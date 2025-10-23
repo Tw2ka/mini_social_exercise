@@ -122,4 +122,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    with app.app_context():
+        main()
+
+# printtaa 10 eniten postauksia sisältävää topicia + määrät vikassa display funktiossa
