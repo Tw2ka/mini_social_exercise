@@ -50,7 +50,6 @@
                         <th>Created At</th>
                         <th>Risk Level</th>
                         <th>Actions</th>
-                        <th>Reports</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -60,7 +59,6 @@
                         <td><a href="{{ url_for('user_profile', username=user.username) }}">{{ user.username }}</a></td>
                         <td style="max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ user.profile or 'N/A' }}">{{ user.profile or 'N/A' }}</td>
                         <td>{{ user.created_at|datetimeformat }}</td>
-                        <td>{{ post.report_count }}</td>
                         <td>
                             {% if user.risk_label == "HIGH" %}
                                 <span class="badge bg-danger">HIGH</span>
@@ -111,6 +109,7 @@
                         <th>Created At</th>
                         <th>Risk Level</th>
                         <th>Actions</th>
+                        <th>Reports</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -137,6 +136,7 @@
                                 <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                             </form>
                         </td>
+                        <td>{{ post.report_count }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

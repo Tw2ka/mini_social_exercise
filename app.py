@@ -722,7 +722,7 @@ def unfollow_user(user_id):
 def admin_dashboard():
     """Displays the admin dashboard with users, posts, and comments, sorted by risk."""
 
-    #topic_search()
+    # topic_search()
 
     if session.get('username') != 'admin':
         flash("You do not have permission to access this page.", "danger")
@@ -780,25 +780,25 @@ def admin_dashboard():
     total_posts_pages = (total_posts_count + PAGE_SIZE - 1) // PAGE_SIZE
 
     posts_raw = query_db(f'''
-      SELECT 
-          p.id, 
-          p.content, 
-          p.created_at, 
-          u.username, 
-          u.created_at as user_created_at,
-          COUNT(pr.id) as report_count 
-      FROM 
-          posts p 
-      JOIN 
-          users u ON p.user_id = u.id
-      LEFT JOIN 
-          post_reports pr ON p.id = pr.post_id
-      GROUP BY 
-          p.id
-      ORDER BY 
-          p.id DESC
-      LIMIT ? OFFSET ?
-  ''', (PAGE_SIZE, posts_offset))
+        SELECT 
+            p.id, 
+            p.content, 
+            p.created_at, 
+            u.username, 
+            u.created_at as user_created_at,
+            COUNT(pr.id) as report_count 
+        FROM 
+            posts p 
+        JOIN 
+            users u ON p.user_id = u.id
+        LEFT JOIN 
+            post_reports pr ON p.id = pr.post_id
+        GROUP BY 
+            p.id
+        ORDER BY 
+            p.id DESC
+        LIMIT ? OFFSET ?
+    ''', (PAGE_SIZE, posts_offset))
     posts = []
     for post in posts_raw:
         post_dict = dict(post)
@@ -924,7 +924,8 @@ def rules():
     return render_template('rules.html.j2')
 
 
-#alla oleva lisätty report nappia varten
+# alla oleva lisätty report nappia varten
+
 @app.route('/posts/<int:post_id>/report_post', methods=['POST'])
 def report_post(post_id):
     """Handles reporting a post."""
@@ -936,7 +937,8 @@ def report_post(post_id):
         return redirect(url_for('login'))
 
     # Find the post in the database
-    post = query_db('SELECT id, user_id FROM posts WHERE id = ?', (post_id,), one=True)
+    post = query_db('SELECT id, user_id FROM posts WHERE id = ?',
+                    (post_id,), one=True)
 
     # Check if the post exists and if the current user is the owner
     if not post:
@@ -947,19 +949,25 @@ def report_post(post_id):
         # Security check: prevent users from reporting their own posts.
         flash('You do can not report your own post.', 'danger')
         return redirect(request.referrer)
-    
+
     # Check if the user already submitted a report
-    report = query_db('SELECT * FROM post_reports WHERE reporter_id = ? AND post_id = ?', (user_id, post_id,), one=True)
+    report = query_db(
+        'SELECT * FROM post_reports WHERE reporter_id = ? AND post_id = ?', (user_id, post_id,), one=True)
     if report:
         flash('You already submitted a report for this post.', 'danger')
         return redirect(request.referrer)
 
     # If all checks pass, proceed with report
     db = get_db()
-    db.execute('INSERT INTO post_reports (post_id, reporter_id) VALUES (?, ?)', (post_id, user_id))
+    db.execute(
+        'INSERT INTO post_reports (post_id, reporter_id) VALUES (?, ?)', (post_id, user_id))
     db.commit()
 
     flash('The post was successfully reported.', 'success')
+
+    # Redirect back to the page the user came from, or the feed as a fallback
+    return redirect(request.referrer or url_for('feed'))
+
 
 @app.template_global()
 def loop_color(user_id):
@@ -1249,6 +1257,7 @@ def moderate_content(content):
                 pass
 
     return moderate_content, score
+
 
 """
 def topic_search():

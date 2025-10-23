@@ -19,6 +19,15 @@
             </form>
         </div>
         {% else %}
+        {% if session.get('user_id') %}
+        <div>
+          <form action="{{ url_for('report_post', post_id=post.id) }}" method="POST"  >
+            <button type="submit" class="btn btn-danger" title="Report Post">
+              Report
+            </button>
+          </form>
+        </div>
+        {% endif %}
         <small class="text-muted">{{ post.created_at|datetimeformat }}</small>
         {% endif %}
       </div>
@@ -62,16 +71,6 @@
 
         </div>
 
-        {% endif %}
-
-        {% if session.get('user_id') %}
-          <div>
-            <form action="{{ url_for('report_post', post_id=post.id) }}" method="POST"  >
-              <button type="submit" class="btn btn-danger" title="Report Post">
-                Report
-              </button>
-            </form>
-          </div>
         {% endif %}
 
       </div>
