@@ -722,7 +722,7 @@ def unfollow_user(user_id):
 def admin_dashboard():
     """Displays the admin dashboard with users, posts, and comments, sorted by risk."""
 
-    topic_search()
+    #topic_search()
 
     if session.get('username') != 'admin':
         flash("You do not have permission to access this page.", "danger")
@@ -780,11 +780,25 @@ def admin_dashboard():
     total_posts_pages = (total_posts_count + PAGE_SIZE - 1) // PAGE_SIZE
 
     posts_raw = query_db(f'''
-        SELECT p.id, p.content, p.created_at, u.username, u.created_at as user_created_at
-        FROM posts p JOIN users u ON p.user_id = u.id
-        ORDER BY p.id DESC -- Order by ID for consistent pagination before risk sort
-        LIMIT ? OFFSET ?
-    ''', (PAGE_SIZE, posts_offset))
+      SELECT 
+          p.id, 
+          p.content, 
+          p.created_at, 
+          u.username, 
+          u.created_at as user_created_at,
+          COUNT(pr.id) as report_count 
+      FROM 
+          posts p 
+      JOIN 
+          users u ON p.user_id = u.id
+      LEFT JOIN 
+          post_reports pr ON p.id = pr.post_id
+      GROUP BY 
+          p.id
+      ORDER BY 
+          p.id DESC
+      LIMIT ? OFFSET ?
+  ''', (PAGE_SIZE, posts_offset))
     posts = []
     for post in posts_raw:
         post_dict = dict(post)
@@ -909,6 +923,43 @@ def admin_delete_comment(comment_id):
 def rules():
     return render_template('rules.html.j2')
 
+
+#alla oleva lisätty report nappia varten
+@app.route('/posts/<int:post_id>/report_post', methods=['POST'])
+def report_post(post_id):
+    """Handles reporting a post."""
+    user_id = session.get('user_id')
+
+    # Block access if user is not logged in
+    if not user_id:
+        flash('You must be logged in to report a post.', 'danger')
+        return redirect(url_for('login'))
+
+    # Find the post in the database
+    post = query_db('SELECT id, user_id FROM posts WHERE id = ?', (post_id,), one=True)
+
+    # Check if the post exists and if the current user is the owner
+    if not post:
+        flash('Post not found.', 'danger')
+        return redirect(url_for('feed'))
+
+    if post['user_id'] == user_id:
+        # Security check: prevent users from reporting their own posts.
+        flash('You do can not report your own post.', 'danger')
+        return redirect(request.referrer)
+    
+    # Check if the user already submitted a report
+    report = query_db('SELECT * FROM post_reports WHERE reporter_id = ? AND post_id = ?', (user_id, post_id,), one=True)
+    if report:
+        flash('You already submitted a report for this post.', 'danger')
+        return redirect(request.referrer)
+
+    # If all checks pass, proceed with report
+    db = get_db()
+    db.execute('INSERT INTO post_reports (post_id, reporter_id) VALUES (?, ?)', (post_id, user_id))
+    db.commit()
+
+    flash('The post was successfully reported.', 'success')
 
 @app.template_global()
 def loop_color(user_id):
@@ -1199,12 +1250,13 @@ def moderate_content(content):
 
     return moderate_content, score
 
-
+"""
 def topic_search():
     nltk.download('punkt')
     nltk.download('stopwords')
     nltk.download('wordnet')
     nltk.download('punkt_tab')
+    nltk.download('vader_lexicon')
 
     db = get_db()
     cursor = db.cursor()
@@ -1255,37 +1307,28 @@ def topic_search():
     for i, count in enumerate(topic_counts):
         print(f"Topic {i}: {count} posts")
 
-
-def sentiment():
-    # Download the VADER lexicon
-    nltk.download('vader_lexicon')
-
-    # df = pd.read_csv('reviews.csv')
-    db = get_db()
-    cursor = db.cursor()
-    data_frame = pd.read_sql_query('SELECT content FROM posts', db)
-    df = pd.DataFrame(data_frame)
-
     # Initialize the VADER sentiment analyser
     sia = SentimentIntensityAnalyzer()
 
     # Calculate sentiment scores for each review
-    sentiment_score = df.apply(
-        lambda review: sia.polarity_scores(df))
+    #df['sentiment_score'] = df['Review'].apply(
+    #    lambda review: sia.polarity_scores(review)['compound'])
+    data['sentiment_score'] = data[dominant_topic].apply(
+        lambda dominant_topic: sia.polarity_scores(dominant_topic)['compound'])
 
     # First, calculate both the count and mean sentiment for each location
-    # location_stats = df.groupby(
+    #location_stats = data.groupby(
     #    'location')['sentiment_score'].agg(['count', 'mean'])
 
     # Filter for locations with at least 3 reviews**
-    # filtered_sentiment_by_location = location_stats[location_stats['count'] >= 3]
+    filtered_sentiment_by_location = location_stats[location_stats['count'] >= 3]
 
     # Sort the filtered results by the mean sentiment score
-    # sorted_filtered_sentiment = filtered_sentiment_by_location.sort_values(
-    #    by='mean', ascending=False)
+    sorted_filtered_sentiment = filtered_sentiment_by_location.sort_values(
+        by='mean', ascending=False)
 
-    # print("Average sentiment score for each location with at least 3 reviews:")
-    # print(sorted_filtered_sentiment)
+    print("Average sentiment score for each location with at least 3 reviews:")
+    print(sorted_filtered_sentiment)"""
 
 
 if __name__ == '__main__':
