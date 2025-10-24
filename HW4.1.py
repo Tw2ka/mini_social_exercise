@@ -52,7 +52,7 @@ def main():
     data = pd.DataFrame(data_frame)
 
     stop_words = stopwords.words('english')
-    stop_words.extend(['day', 'one', 'today', 'finally', 'like', 'see', 'incredible', 'would', 'best', 'always', 'amazing', 'bought', 'quick' 'people', 'new', 'fun', 'think', 'know', 'believe', 'many', 'thing', 'need', 'small', 'even', 'make', 'love',
+    stop_words.extend(['fuck', 'day', 'one', 'today', 'finally', 'like', 'see', 'incredible', 'would', 'best', 'always', 'amazing', 'bought', 'quick' 'people', 'new', 'fun', 'think', 'know', 'believe', 'many', 'thing', 'need', 'small', 'even', 'make', 'love',
                        'mean', 'fact', 'question', 'time', 'reason', 'also', 'could', 'true', 'well',  'life', 'said', 'year', 'going', 'good', 'really', 'much', 'want', 'back', 'look', 'article', 'host', 'university', 'reply', 'thanks', 'mail', 'post', 'please'])
 
     lemmatizer = WordNetLemmatizer()
@@ -76,7 +76,7 @@ def main():
     optimal_coherence = -100
     optimal_lda = None
     optimal_k = 0
-    for K in range(40, 45):
+    for K in range(41, 43):
 
         # Train LDA model. We want to determine how we can best split the data into 4 topics
         lda = LdaModel(corpus, num_topics=K, id2word=dictionary,
@@ -100,10 +100,12 @@ def main():
     # Okay, we tried many topic numbers and selected the best one. Let's see how our trained LDA model for the optimal number of topics performed.
 
     # First, to see the topics, print top 5 most representative words per topic
+    topic_words = {}
     print(
         f'These are the words most representative of each of the {optimal_k} topics:')
-    for i, topic in optimal_lda.print_topics(num_words=5):
+    for i, topic in optimal_lda.print_topics(num_words=1, num_topics=optimal_k):
         print(f"Topic {i}: {topic}")
+        topic_words[i] = topic
 
     # Then, let's determine how many posts we have for each topic
     # Count the dominant topic for each document
@@ -116,21 +118,15 @@ def main():
         # add 1 to the most probable topic's counter
         topic_counts[dominant_topic] += 1
 
-    # Display the topic counts
-    for i, count in enumerate(topic_counts):
+    # Display the topic counts in order, most posts first
+
+    print(
+        f'These are the topics ordered by amount of posts')
+
+    for i, count in sorted(enumerate(topic_counts), key=lambda x: x[1], reverse=True):
         print(f"Topic {i}: {count} posts")
-
-    for i, topic in optimal_lda.print_topics(num_words=1):
-        Topic_names = f"Topic {i}: {topic}"
-
-    for i, count in enumerate(topic_counts):
-        Number_of_posts_in_topic = f"Topic {i}: {count} posts"
-
-    print(Topic_names, Number_of_posts_in_topic)
 
 
 if __name__ == '__main__':
     with app.app_context():
         main()
-
-# printtaa 10 eniten postauksia sisältävää topicia + määrät vikassa display funktiossa
