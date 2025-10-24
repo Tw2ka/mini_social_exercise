@@ -76,7 +76,7 @@ def main():
     optimal_coherence = -100
     optimal_lda = None
     optimal_k = 0
-    for K in range(10, 50):
+    for K in range(40, 45):
 
         # Train LDA model. We want to determine how we can best split the data into 4 topics
         lda = LdaModel(corpus, num_topics=K, id2word=dictionary,
@@ -119,6 +119,14 @@ def main():
     # Display the topic counts
     for i, count in enumerate(topic_counts):
         print(f"Topic {i}: {count} posts")
+
+    for i, topic in optimal_lda.print_topics(num_words=1):
+        Topic_names = f"Topic {i}: {topic}"
+
+    for i, count in enumerate(topic_counts):
+        Number_of_posts_in_topic = f"Topic {i}: {count} posts"
+
+    print(Topic_names, Number_of_posts_in_topic)
 
 
 if __name__ == '__main__':
