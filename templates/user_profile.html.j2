@@ -29,6 +29,15 @@
                   <button type="submit" class="btn btn-primary">Follow</button>
                 </form>
               {% endif %}
+              {% if session.get('user_id') %}
+              <div>
+                <form action="{{ url_for('report_user', user_id=user.id) }}" method="POST"  >
+                  <button type="submit" class="btn btn-danger" title="Report User">
+                    Report
+                  </button>
+                </form>
+              </div>
+              {% endif %}
             </div>
           {% endif %}
 
