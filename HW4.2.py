@@ -119,7 +119,8 @@ def main():
         joined_text = " ".join(topic_word)
         topic_sentiment_score = sia.polarity_scores(joined_text)['compound']
         topic_sentiments[i] = topic_sentiment_score
-        print(joined_text, topic_sentiment_score)
+        if (topic_sentiment_score != 0):
+            print(joined_text, topic_sentiment_score)
 
 
 if __name__ == '__main__':

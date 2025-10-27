@@ -764,11 +764,10 @@ def admin_dashboard():
             u.created_at,
             COUNT(ur.id) as user_reports
         FROM users u
-        LEFT JOIN
-            user_reports ur ON u.id = ur.id')
-        GROUPBY
+        LEFT JOIN user_reports ur ON u.id = ur.user_id
+        GROUP BY
             u.id
-    ''',)
+    ''')
     all_users = []
     for user in all_users_raw:
         user_dict = dict(user)
@@ -797,16 +796,13 @@ def admin_dashboard():
             p.created_at,
             u.username,
             u.created_at as user_created_at,
-            COUNT(pr.id) as report_count,
-            COUNT(ur.id) as user_reports
+            COUNT(pr.id) as report_count
         FROM
             posts p
         JOIN
             users u ON p.user_id = u.id
         LEFT JOIN
             post_reports pr ON p.id = pr.post_id
-        LEFT JOIN
-            user_reports ur ON u.id = ur.id
         GROUP BY
             p.id
         ORDER BY
@@ -992,7 +988,7 @@ def report_user(user_id):
 
     # Block access if user is not logged in
     if not reporter_id:
-        flash('You must be logged in to report a post.', 'danger')
+        flash('You must be logged in to report a user.', 'danger')
         return redirect(url_for('login'))
 
     # Find the user in the database
@@ -1004,16 +1000,16 @@ def report_user(user_id):
         flash('User not found.', 'danger')
         return redirect(url_for('feed'))
 
-    # if user['user_id'] == reporter_id:
+    if user['id'] == reporter_id:
         # Security check: prevent from reporting yourself.
-    #    flash('You do can not report yourself.', 'danger')
-     #   return redirect(request.referrer)
+        flash('You can not report yourself.', 'danger')
+        return redirect(request.referrer)
 
     # Check if the user already submitted a report
     report = query_db(
         'SELECT * FROM user_reports WHERE reporter_id = ? AND user_id = ?', (reporter_id, user_id), one=True)
     if report:
-        flash('You already submitted a report for this post.', 'danger')
+        flash('You already submitted a report for this user.', 'danger')
         return redirect(request.referrer)
 
     # If all checks pass, proceed with report
